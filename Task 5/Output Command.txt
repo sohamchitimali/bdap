@@ -1,0 +1,15 @@
+Guys, to see the actual output in hive environment, please do the following :
+
+-come out of the database
+-now you will be in the hive shell
+
+in the hive shell type this 
+
+SET hive.cli.print.header=true;
+SET hive.cli.print.current.db=true;
+
+then, go to bd
+
+use bdaplab;
+
+Then run the query

@@ -1,0 +1,4 @@
+customer_id,customer_name,email,phone,address,date_joined,country,state
+101,Alice,alice@example.com,1234567890,12th Ave|Hyderabad|Telangana|500001,2022-05-10 00:00:00,India,Telangana
+102,Bob,bob@example.com,2345678901,45th St|Bangalore|Karnataka|560001,2022-06-20 00:00:00,India,Karnataka
+103,Charlie,charlie@example.com,3456789012,MG Road|Mumbai|Maharashtra|400001,2022-07-15 00:00:00,India,Maharashtra

@@ -1,0 +1,4 @@
+product_id,product_name,category,price,manufacturer,date_added
+201,Laptop,Electronics,500.0,HP,2023-01-10 00:00:00
+202,Phone,Electronics,400.0,Samsung,2023-02-15 00:00:00
+203,Printer,Office,600.0,Canon,2023-03-20 00:00:00
