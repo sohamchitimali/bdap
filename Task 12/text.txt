@@ -1,0 +1,417 @@
+Task-5 
+
+WARNING : '->' indicates command, '----' indicates steps
+
+----------------------Open CLoudera 
+
+-> hive
+-> CREATE DATABASE bdaplab;
+-> SHOW DATABASES;
+-> USE bdaplab;
+-> SET hive.cli.print.current.db=true;
+-> SELECT current_database();
+
+------------[Optional]
+------------To drop Database ;
+
+-> DROP DATABASE bdaplab;
+-> DROP DATABASE bdaplab CASCADE;
+
+-------------------------------------------Creating tables in Hive
+
+-------------sales_order table
+
+-> CREATE TABLE sales_order (
+  order_id INT,
+  customer_id INT,
+  product_id INT,
+  order_date TIMESTAMP,
+  order_amount DOUBLE,
+  quantity INT,
+  discount DOUBLE,
+  tax DOUBLE,
+  total_amount DOUBLE
+ )
+ ROW FORMAT DELIMITED
+ FIELDS TERMINATED BY ','
+ STORED AS TEXTFILE;
+
+product Table
+
+-> CREATE TABLE product (
+  product_id INT,
+  product_name STRING,
+  category STRING,
+  price DOUBLE,
+  manufacturer STRING,
+  date_added TIMESTAMP
+ )
+ ROW FORMAT DELIMITED
+ FIELDS TERMINATED BY ','
+ STORED AS TEXTFILE;
+
+--------------customer Table (with STRUCT and Partition)
+
+-> CREATE TABLE customer (
+  customer_id INT,
+  customer_name STRING,
+  email STRING,
+  phone STRING,
+  address STRUCT<
+    street:STRING,
+    city:STRING,
+    state:STRING,
+    zip:INT
+  >,
+  date_joined TIMESTAMP
+ )
+ PARTITIONED BY (country STRING, state STRING)
+ ROW FORMAT DELIMITED
+ FIELDS TERMINATED BY ','
+ COLLECTION ITEMS TERMINATED BY '|'
+ STORED AS TEXTFILE;
+
+------------Use three .csv files, that are, sales_order, customer and product. Upload them into WINSCP
+
+------------Steps to Upload Files to Cloudera VM Using WinSCP
+
+-> exit hive
+-> ifconfig
+
+------------WARNING : Look for a section like eth0 or enp0s3 and find the line:
+inet 192.168.x.x
+This is your VM's IP address (e.g., 192.168.56.101).
+
+----------------------Open WINSCP
+
+-> File Protocol	SCP
+-> Host Name	IP address of your VM (e.g., 192.168.56.101)
+-> Port Number	22
+-> Username	cloudera
+-> Password	cloudera
+
+-----------------Login
+
+ Left Panel = Your Windows files
+ Right Panel = Cloudera VM's Linux file system
+
+------------------Upload the .csv Files
+--------------select o sales_order.csv, o product.csv, o customer.csv from LEFT PANEL
+
+------------DRAG and DRPP all three .csv files from LEFT to RIGHT.
+
+-------------Next Step: Load These Files into Hive Tables
+
+-> hive
+-> USE bdaplab;
+
+-> LOAD DATA LOCAL INPATH '/home/cloudera/sales_order.csv'
+OVERWRITE INTO TABLE sales_order;
+
+-> LOAD DATA LOCAL INPATH '/home/cloudera/product.csv'
+OVERWRITE INTO TABLE product;
+
+-> ALTER TABLE customer ADD PARTITION (country='India', state='Telangana');
+LOAD DATA LOCAL INPATH '/home/cloudera/customer.csv'
+OVERWRITE INTO TABLE customer
+PARTITION (country='India', state='Telangana');
+
+-> SELECT * FROM sales_order;
+
+-> SELECT * FROM product;
+
+-> SELECT * FROM customer WHERE state='Telangana';
+
+----------------------------------Hive Queries for Analysis
+
+-------Find Total Sales Amount
+
+-> SELECT SUM(total_amount) AS total_sales
+FROM sales_order;
+
+EXPECTED OUTPUT : 3920.0
+
+-------Find Top N Products by Sales
+
+-> SELECT product_id, SUM(total_amount) AS total_sales
+FROM sales_order
+GROUP BY product_id
+ORDER BY total_sales DESC
+LIMIT 2;
+
+EXPECTED OUTPUT : 202	1550.0
+                  203	1320.0
+
+
+-------Find Customer-Wise Sales
+
+-> SELECT customer_id, SUM(total_amount) AS customer_total
+FROM sales_order
+GROUP BY customer_id;
+
+EXPECTED OUTPUT : NULL	NULL
+                  101	1050.0
+                  102	1550.0
+                  103	1320.0
+
+
+-------Find Monthly Sales Trends
+
+-> SELECT MONTH(order_date) AS month, SUM(total_amount) AS monthly_sales
+FROM sales_order
+GROUP BY MONTH(order_date)
+ORDER BY month;
+
+EXPECTED OUTPUT : NULL	NULL
+                  10	2600.0
+                  11	1320.0
+
+-------Find Product-Wise Quantity Sold
+
+-> SELECT product_id, SUM(quantity) AS total_quantity_sold
+FROM sales_order
+GROUP BY product_id;
+
+EXPECTED OUTPUT : NULL	NULL
+                  201	2
+                  202	3
+                  203	1
+
+
+-------Find the Highest-Priced Product in Each Category
+
+-> SELECT category, MAX(price) AS max_price
+FROM product
+GROUP BY category;
+
+EXPECTED OUTPUT : Electronics	500.0
+                  Office	600.0
+                  category	NULL
+
+
+
+
+
+Task 6 
+-------
+
+ Hive UDF Experiment — Complete Steps with Errors & Debugging
+
+JAVA CODE 
+------------------------------------------------------------
+
+
+package myudfs;
+
+import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.io.Text;
+
+public class ReverseCase extends UDF {
+    public Text evaluate(Text input) {
+        if (input == null) return null;
+        String str = input.toString();
+        StringBuilder sb = new StringBuilder();
+        for (char c : str.toCharArray()) {
+            if (Character.isUpperCase(c)) {
+                sb.append(Character.toLowerCase(c));
+            } else if (Character.isLowerCase(c)) {
+                sb.append(Character.toUpperCase(c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return new Text(sb.toString());
+    }
+}
+
+
+
+
+Step 1: Upload Java File (ReverseCase.java) to Cloudera VM
+------------------------------------------------------------
+
+Action:
+
+Open WinSCP.
+
+Connect to your Cloudera VM via SFTP:
+
+Hostname: VM IP
+
+Username: cloudera
+
+Password: cloudera
+
+Upload ReverseCase.java to /home/cloudera/.
+
+ Possible Errors & Fixes:
+
+Error	Cause	Fix
+Connection refused	VM network not reachable	Ensure VM network is NAT/Bridged and IP correct
+Permission denied	File system permissions	Upload to /home/cloudera/ (user’s home directory)
+
+Step 2: Create Package Folder and Move File
+------------------------------------------------------------
+
+cd /home/cloudera
+mkdir -p myudfs
+mv ReverseCase.java myudfs/
+
+
+Explanation:
+
+mkdir -p myudfs → creates folder for package myudfs
+
+mv ReverseCase.java myudfs/ → moves file into package folder
+
+ Possible Errors & Fixes:
+
+Error	Cause	Fix
+mkdir: cannot create directory	Already exists	-p avoids this issue
+mv: cannot move file	Wrong path	Ensure file exists in /home/cloudera/
+
+Step 3: Compile Java File
+------------------------------------------------------------
+
+
+javac -classpath "`hadoop classpath`:/usr/lib/hive/lib/*" myudfs/ReverseCase.java
+
+
+Explanation:
+
+Compiles the Java file using Hadoop and Hive libraries
+
+Quotes "..." ensure the classpath is treated as a single argument
+
+ Possible Errors & Fixes:
+
+Error	Cause	Fix
+javac: invalid flag: :/usr/lib/hive/lib/*	Classpath not quoted	Add quotes: "``hadoop classpath``:/usr/lib/hive/lib/*"
+package myudfs does not exist	File not in proper folder	Ensure ReverseCase.java is in myudfs/ folder
+cannot find symbol	Missing Hadoop/Hive jars	Verify path /usr/lib/hive/lib/* or adjust to actual Hive installation
+javac: command not found	JDK not installed	Install JDK and set JAVA_HOME correctly
+
+Verify Compilation:
+
+ls myudfs/
+
+
+ Should see ReverseCase.class.
+
+Step 4: Create JAR File
+------------------------------------------------------------
+
+jar -cf reversecase.jar myudfs/ReverseCase.class
+
+
+Explanation:
+
+Packages compiled class into reversecase.jar
+
+Maintains correct package path (myudfs.ReverseCase)
+
+ Possible Errors & Fixes:
+
+Error	Cause	Fix
+jar: command not found	JDK not installed	Install JDK and set PATH
+Wrong JAR structure	Compiled class in wrong folder	Ensure .class is inside myudfs/ folder
+
+Step 5: Start Hive and Register JAR
+------------------------------------------------------------
+
+
+hive
+
+
+Inside Hive shell:
+
+ADD JAR /home/cloudera/reversecase.jar;
+CREATE TEMPORARY FUNCTION reverse_case AS 'myudfs.ReverseCase';
+
+
+ Explanation:
+
+ADD JAR → load external Java JAR into Hive session
+
+CREATE TEMPORARY FUNCTION → map Java class to Hive function
+
+ Possible Errors & Fixes:
+
+Error	Cause	Fix
+Error: Class not found	Wrong package name	Ensure package is myudfs in Java code
+SemanticException [Error 10011]	Typo in function name	Correct spelling in CREATE TEMPORARY FUNCTION
+
+Step 6: Create and Populate Test Table
+------------------------------------------------------------
+
+CREATE TABLE test_names(name STRING);
+
+INSERT INTO test_names VALUES 
+('Alice'),
+('Bob'),
+('Cloudera'),
+('BigData'),
+('hIVE');
+
+
+ Possible Errors & Fixes:
+
+Error	Cause	Fix
+Table already exists	Table exists from previous run	Drop table: DROP TABLE test_names;
+Permission errors	Hive user doesn’t have rights	Use default user cloudera
+Step 7: Test the UDF
+SELECT name, reverse_case(name) AS reversed_name FROM test_names;
+
+
+ Expected Output:
+------------------------------------------------------------
+
+name	reversed_name
+Alice	aLICE
+Bob	bOB
+Cloudera	cLOUDERA
+BigData	bIGdATA
+hIVE	Hive
+
+
+
+
+
+Task 12 
+
+Part 1
+
+Use WinSCP transfer the .tar file to /home/cloudera folder
+
+Extract the tarball
+
+cd /home/cloudera
+tar -xvzf numpy-1.6.2.tar.gz
+
+This should create a folder:
+
+/home/cloudera/numpy-1.6.2
+
+cd /home/cloudera/numpy-1.6.2
+sudo python setup.py install
+
+Go back to your home directory:
+
+cd ~
+python -c "import numpy; print(numpy.__version__)"
+
+If installation was successful, you should see:
+
+1.6.2
+
+spark-submit task12_part1_lr_rdd.py
+
+
+
+
+
+Part 2
+
+Bring Python to file to /home/cloudera using WinSCP and run the command
+
+python task12_part2_id3.py
